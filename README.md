@@ -162,4 +162,4 @@ To add new New Relic capabilities:
 
 ## License
 
-[Add your license here]
+MIT
