@@ -3,6 +3,7 @@
 
 import os
 import logging
+import sys
 from typing import Any, Dict, Optional
 
 from mcp.server import Server, NotificationOptions
@@ -14,7 +15,8 @@ from pydantic import AnyUrl
 from .client import NewRelicClient
 from .models import LogQueryRequest, LogQueryResponse
 
-logging.basicConfig(level=logging.INFO)
+# Configure logging to use stderr to avoid interfering with MCP JSON-RPC on stdout
+logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
 
