@@ -65,29 +65,33 @@ The `oneshot` directory contains a Python-based MCP server built by Claude in ne
 
 ### Setup for Claude Code
 
-For Claude Code, the configuration is similar but uses the `.claudecode/config.json` file in your project:
+Claude Code provides a simple command to add MCP servers:
 
-1. **Create configuration directory:**
+1. **Clone the repository:**
    ```bash
-   mkdir -p .claudecode
+   git clone https://github.com/yourusername/mcp-server-newrelic.git
+   cd mcp-server-newrelic
    ```
 
-2. **Create config file:**
-   ```json
-   {
-     "mcpServers": {
-       "newrelic": {
-         "command": "./oneshot/run_server.sh",
-         "cwd": "./oneshot",
-         "env": {
-           "NEW_RELIC_API_KEY": "NRAK-your-key-here"
-         }
-       }
-     }
-   }
+2. **Create environment file:**
+   Create a `.env` file in the `oneshot` folder with your New Relic API key:
+   ```bash
+   echo "NEW_RELIC_API_KEY=NRAK-your-key-here" > oneshot/.env
    ```
 
-3. **Open your project in Claude Code** - it will automatically detect and load the MCP server.
+3. **Build the server:**
+   ```bash
+   cd oneshot
+   ./build.sh
+   ```
+
+4. **Add to Claude Code:**
+   Simply run this command to register the MCP server:
+   ```bash
+   claude mcp add /path/to/mcp-server-newrelic/oneshot/run_server.sh
+   ```
+
+That's it! Claude Code will now have access to your New Relic data.
 
 ## Usage Examples
 
