@@ -6,7 +6,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Redirect all output to stderr to avoid interfering with MCP JSON-RPC on stdout
 echo "🚀 Starting New Relic MCP Server..." >&2
 echo "Script directory: $SCRIPT_DIR" >&2
-echo "Working directory: $(pwd)" >&2
 
 # Load environment variables from .env file (from script directory)
 if [ -f "$SCRIPT_DIR/.env" ]; then
@@ -23,27 +22,34 @@ else
     echo "✓ NEW_RELIC_API_KEY is set (length: ${#NEW_RELIC_API_KEY})" >&2
 fi
 
-# Install dependencies if needed (check if package is installed)
-echo "Checking Python dependencies..." >&2
-if ! python -c "import newrelic_mcp" 2>/dev/null; then
-    echo "Installing dependencies..." >&2
-    cd "$SCRIPT_DIR"
-    echo "Running: pip install -e . in directory: $(pwd)" >&2
-    pip install -e . 2>&1 | tee /tmp/pip_install.log >&2
-    if [ ${PIPESTATUS[0]} -eq 0 ]; then
-        echo "✓ Dependencies installed successfully" >&2
-    else
-        echo "❌ Failed to install dependencies" >&2
-        echo "Pip install output:" >&2
-        tail -10 /tmp/pip_install.log >&2
-        exit 1
-    fi
-else
-    echo "✓ Dependencies already installed" >&2
+# Auto-build if needed
+needs_build=false
+if [ ! -d "$SCRIPT_DIR/venv" ]; then
+    echo "📦 Virtual environment not found - building..." >&2
+    needs_build=true
+elif [ -f "$SCRIPT_DIR/build.sh" ] && [ "$SCRIPT_DIR/build.sh" -nt "$SCRIPT_DIR/venv" ]; then
+    echo "📦 Build script is newer than venv - rebuilding..." >&2
+    needs_build=true
 fi
 
+if [ "$needs_build" = true ]; then
+    if [ ! -f "$SCRIPT_DIR/build.sh" ]; then
+        echo "❌ No build.sh found and no venv exists. Cannot build server." >&2
+        exit 1
+    fi
+    
+    echo "Running build.sh..." >&2
+    if ! "$SCRIPT_DIR/build.sh"; then
+        echo "❌ Build failed!" >&2
+        exit 1
+    fi
+    echo "✅ Build completed successfully" >&2
+fi
+
+echo "✓ Using self-contained virtual environment" >&2
 echo "Launching New Relic MCP server..." >&2
 echo "----------------------------------------" >&2
 
-# Run the Python MCP server
-exec "$SCRIPT_DIR/server"
+# Activate venv and run the Python MCP server
+source "$SCRIPT_DIR/venv/bin/activate"
+exec python -m newrelic_mcp.main
