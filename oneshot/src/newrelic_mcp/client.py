@@ -9,6 +9,9 @@ from .models import LogQueryRequest, LogQueryResponse, LogEntry
 
 logger = logging.getLogger(__name__)
 
+# Maximum response size in characters to avoid token limits
+MAX_RESPONSE_SIZE = 20000
+
 
 class NewRelicClient:
     """Client for interacting with New Relic GraphQL API."""
@@ -71,6 +74,55 @@ class NewRelicClient:
         nrql += f" LIMIT {request.limit}"
         
         return nrql
+    
+    def _estimate_response_size(self, logs: List[LogEntry]) -> int:
+        """Estimate the size of the JSON response in characters.
+        
+        Args:
+            logs: List of log entries
+            
+        Returns:
+            Estimated size in characters
+        """
+        # Create a sample response to measure size
+        sample_response = LogQueryResponse(
+            logs=logs,
+            total_results=len(logs),
+            query_executed="sample query"
+        )
+        return len(sample_response.to_json())
+    
+    def _truncate_logs_to_size(self, logs: List[LogEntry], max_size: int) -> tuple[List[LogEntry], bool]:
+        """Truncate logs list to fit within size limit.
+        
+        Args:
+            logs: Original list of log entries
+            max_size: Maximum allowed size in characters
+            
+        Returns:
+            Tuple of (truncated_logs, was_truncated)
+        """
+        if not logs:
+            return logs, False
+        
+        # Binary search to find the maximum number of logs that fit
+        left, right = 1, len(logs)
+        best_fit = 0
+        
+        while left <= right:
+            mid = (left + right) // 2
+            test_logs = logs[:mid]
+            
+            if self._estimate_response_size(test_logs) <= max_size:
+                best_fit = mid
+                left = mid + 1
+            else:
+                right = mid - 1
+        
+        if best_fit < len(logs):
+            return logs[:best_fit], True
+        else:
+            return logs, False
     
     async def query_logs(self, request: LogQueryRequest) -> LogQueryResponse:
         """Query New Relic logs.
@@ -139,10 +191,24 @@ class NewRelicClient:
             if nrql_data.get("totalResult"):
                 total_results = nrql_data["totalResult"].get("count", len(results))
             
+            # Check if we need to truncate due to response size
+            truncated_logs, was_truncated = self._truncate_logs_to_size(logs, MAX_RESPONSE_SIZE)
+            original_limit = None
+            truncated_reason = None
+            
+            if was_truncated:
+                original_limit = request.limit
+                truncated_reason = f"Response too large ({self._estimate_response_size(logs)} chars). Reduced from {len(logs)} to {len(truncated_logs)} logs to fit within {MAX_RESPONSE_SIZE} character limit."
+                logger.warning(f"Truncated logs response: {truncated_reason}")
+                logs = truncated_logs
+            
             return LogQueryResponse(
                 logs=logs,
                 total_results=total_results,
-                query_executed=nrql
+                query_executed=nrql,
+                truncated=was_truncated,
+                truncated_reason=truncated_reason,
+                original_limit=original_limit
             )
     
     async def get_account_id(self, account_name: str) -> str:

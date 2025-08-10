@@ -39,6 +39,9 @@ class LogQueryResponse(BaseModel):
     logs: List[LogEntry] = Field(..., description="List of log entries")
     total_results: int = Field(..., description="Total number of results (may exceed limit)")
     query_executed: str = Field(..., description="The NRQL query that was executed")
+    truncated: bool = Field(False, description="Whether results were truncated due to size limits")
+    truncated_reason: Optional[str] = Field(None, description="Reason for truncation if applicable")
+    original_limit: Optional[int] = Field(None, description="Original limit before auto-adjustment")
     
     def to_json(self) -> str:
         """Convert response to formatted JSON string."""
@@ -55,4 +58,13 @@ class LogQueryResponse(BaseModel):
             "total_results": self.total_results,
             "query_executed": self.query_executed
         }
+        
+        # Add truncation info if applicable
+        if self.truncated:
+            data["truncated"] = self.truncated
+            if self.truncated_reason:
+                data["truncated_reason"] = self.truncated_reason
+            if self.original_limit:
+                data["original_limit"] = self.original_limit
+        
         return json.dumps(data, indent=2)
