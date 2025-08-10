@@ -22,9 +22,23 @@ class NewRelicMCPServer:
     """MCP Server for New Relic API interactions."""
     
     def __init__(self):
+        logger.info("Initializing New Relic MCP Server...")
         self.server = Server("newrelic-mcp")
         self.client: Optional[NewRelicClient] = None
+        
+        # Check environment variables
+        api_key = os.getenv("NEW_RELIC_API_KEY")
+        endpoint = os.getenv("NEW_RELIC_API_ENDPOINT", "https://api.newrelic.com/graphql")
+        
+        if api_key:
+            logger.info(f"✓ NEW_RELIC_API_KEY found (length: {len(api_key)})")
+        else:
+            logger.warning("⚠ NEW_RELIC_API_KEY not set - will fail when tools are called")
+        
+        logger.info(f"✓ API Endpoint: {endpoint}")
+        
         self._setup_handlers()
+        logger.info("✓ MCP handlers configured")
     
     def _setup_handlers(self):
         """Set up MCP protocol handlers."""
@@ -131,9 +145,16 @@ class NewRelicMCPServer:
     
     async def run(self):
         """Run the MCP server."""
+        logger.info("Starting New Relic MCP Server...")
+        logger.info("Server name: newrelic-mcp")
+        logger.info("Server version: 0.1.0")
+        logger.info("Available tools: query_logs, get_account_id")
+        
         from mcp.server.stdio import stdio_server
         
+        logger.info("Setting up stdio transport...")
         async with stdio_server() as (read_stream, write_stream):
+            logger.info("🚀 MCP Server ready - waiting for client connections...")
             await self.server.run(
                 read_stream,
                 write_stream,
